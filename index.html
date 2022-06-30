@@ -17,26 +17,105 @@ let svg = d3.select("svg")
     .attr("viewBox", "0 0 " + width + " " + height)
 
 // Load external data
-Promise.all([d3.json("sgmap.json"), d3.csv("population2021.csv")]).then(data => {
+Promise.all([d3.json("https://chi-loong.github.io/CSC3007/assignments/sgmap.json"), d3.csv("https://chi-loong.github.io/CSC3007/assignments/population2021.csv")]).then(data => {
 
-console.log(data[0]);
-console.log(data[1]);
+    console.log(data[0]);
+    console.log(data[1]);
 
-// Map and projection
-var projection = d3.geoMercator()
-    .center([103.851959, 1.290270])
-    .fitExtent([[20, 20], [980, 580]], data[0]);
+    var combinedData = []
+    data[0].features.forEach(function(item){
+        let result = data[1].filter(obj => {
+          return obj.Subzone.toLowerCase() === item.properties.Name.toLowerCase()
+        })
+        if(result.length != 0)
+            item.Population = result[0].Population == "-" ? 0 : parseInt(result[0].Population)
+        else
+            item.Population = 0
+        combinedData.push(item)
+    });
+    console.log(combinedData)
+    const domainText = ["0-499", "500-999", "1000-1999", "2000-4999", "5000-99999", "10000-49999", "50000-99999", "100000-149999", "150000-199999", ">200000"]
+    const colorScale = d3.scaleLinear()
+    .domain([0, 500, 1000, 2000, 5000, 10000, 50000, 100000, 150000, 200000])
+    .range(["#f7fbff","#e3eef9","#cfe1f2","#b5d4e9","#93c3df","#6daed5","#4b97c9","#2f7ebc","#1864aa","#0a4a90"]);
 
-let geopath = d3.geoPath().projection(projection);
+    const tooltip = d3.select("body").append("div")
+            .attr("class", "tooltip")
+            .style("position","absolute")
+            .style("background","rgba(0, 0, 0, 0.5)")
+            .style("padding","10px")
+            .style("border-radius","10px")
+            .style("color","white")
+            .style("visibility","hidden");
 
-svg.append("g")
-    .attr("id", "districts")
-    .selectAll("path")
-    .data(data[0].features)
-    .enter()
-    .append("path")
-    .attr("d", geopath)
-    .attr("fill", "black");
+    // Map and projection
+    var projection = d3.geoMercator()
+        .center([103.851959, 1.290270])
+        .fitExtent([[20, 20], [980, 580]], data[0]);
+
+    let geopath = d3.geoPath().projection(projection);
+
+    svg.append("g")
+        .attr("id", "districts")
+        .selectAll("path")
+        .data(combinedData)
+        .enter()
+        .append("path")
+        .attr("d", geopath)
+        .style('fill', function (d, i) {
+            return colorScale(d.Population);
+        })
+        .style('stroke',"lightgrey")
+        .style('stroke-width',"0.5px")
+        .on("mouseover", (event, d) => {
+            d3.select(".tooltip")
+                .html("Name: "+ d.properties.Name + "<br/>Area Name: "+ d.properties["Planning Area Code"] + "<br/>Region Name: " + d.properties["Region Name"] + "<br/>Population: " + d.Population)
+                .style("left", (event.pageX) + "px")
+                .style("top", (event.pageY) + "px")
+                .style("visibility","visible");
+
+            d3.select(event.currentTarget)
+                .style('stroke',"red")
+                .style('stroke-width',"1.5px");
+
+        })
+        .on("mouseout", (event, d) => {
+            d3.select(".tooltip")
+            .style("visibility","hidden");
+
+            d3.select(event.currentTarget)
+                .style('stroke',"lightgrey")
+                .style('stroke-width',"0.5px");
+        });
+
+    var legend = svg.selectAll('g.legendEntry')
+        .data(colorScale.range())
+        .enter()
+        .append('g').attr('class', 'legendEntry');
+
+    legend
+        .append('rect')
+        .attr("x", function(d,i){
+            return i * 37;
+        })
+        .attr("y", 10)
+       .attr("width", 37)
+       .attr("height", 10)
+       .style("fill", function(d){return d;})
+       .text("Test"); 
+           //the data objects are the fill colors
+
+    var legendLabel = svg.selectAll('g.legendLabel')
+        .data(domainText)
+        .enter()
+        .append('g').attr('class', 'legendLabel')
+        .append('text')
+        .attr("x", function(d,i){
+            return i * 37;
+        })
+        .attr("y", 30)
+        .style("font-size", "5px")
+        .text(d => d);
 })
 
 </script>
